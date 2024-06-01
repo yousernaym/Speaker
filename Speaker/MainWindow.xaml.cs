@@ -6,6 +6,7 @@ using System.Linq;
 using System.Speech.Synthesis;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.System;
 using Windows.UI.StartScreen;
 using Windows.UI.Text.Core;
 using static System.Net.Mime.MediaTypeNames;
@@ -25,6 +26,7 @@ namespace Speaker
             this.InitializeComponent();
             InitSpeech();
             LoadVoices();
+            InputTextBox.Focus(FocusState.Programmatic);
         }
 
         private void InitSpeech()
@@ -63,8 +65,6 @@ namespace Speaker
         private void StartSpeaking()
         {
             _startPosition = InputTextBox.SelectionStart;
-            //if (_startPosition == InputTextBox.Text.Length)
-            //    _startPosition = 0;
             InitSpeech();
             SetVoice();
             SetSpeed();
@@ -81,14 +81,14 @@ namespace Speaker
 
         private void _speechSynthesizer_SpeakProgress(object sender, SpeakProgressEventArgs e)
         {
-            HighlightCurrentWord(e.CharacterPosition + _startPosition, e.CharacterCount);
+            _updatingProgress = true;
+            HighlightText(e.CharacterPosition + _startPosition, e.CharacterCount);
         }
 
-        private void HighlightCurrentWord(int charPosition, int charCount)
+        private void HighlightText(int charPosition, int charCount)
         {
-            _updatingProgress = true;
             InputTextBox.Select(charPosition, charCount);
-            //InputTextBox.Focus(FocusState.Programmatic);
+            InputTextBox.Focus(FocusState.Programmatic);
         }
 
         private void _speechSynthesizer_SpeakCompleted(object sender, SpeakCompletedEventArgs e)
@@ -99,23 +99,97 @@ namespace Speaker
 
         private void InputTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
         {
-            if (e.Key == Windows.System.VirtualKey.Space)
+            if (e.Key == VirtualKey.Space)
             {
                 TogglePlayPauseButton_Click(this, null);
             }
+            else if (e.Key == VirtualKey.Left)
+            {
+                var prevWordPos = FindStartOfPreviousWord();
+                InputTextBox.Select(prevWordPos, 0);
+                e.Handled = true;
+            }
+            else if (e.Key == VirtualKey.Right)
+            {
+                var nextWordPos = FindStartOfNextWord();
+                InputTextBox.Select(nextWordPos, 0);
+                e.Handled = true;
+            }
         }
+
+        int FindStartOfPreviousWord()
+        {
+            var position = InputTextBox.SelectionStart;
+            var text = InputTextBox.Text;
+            if (position >= text.Length)
+                position = text.Length - 1;
+            while (position > 0 && !char.IsWhiteSpace(text[position]))
+                position--;
+            while (position > 0 && char.IsWhiteSpace(text[position]))
+                position--;
+            while (position > 0 && !char.IsWhiteSpace(text[position]))
+                position--;
+
+            return position;
+        }
+
+        int FindStartOfNextWord()
+        {
+            var position = InputTextBox.SelectionStart;
+            var text = InputTextBox.Text;
+            if (position >= text.Length)
+                position = text.Length - 1;
+            while (position < text.Length && !char.IsWhiteSpace(text[position]))
+                position++;
+            while (position < text.Length && char.IsWhiteSpace(text[position]))
+                position++;
+
+            return position;
+        }
+
+        void HighlightWordAt(int position)
+        {
+            var text = InputTextBox.Text;
+            if (position >= text.Length)
+            {
+                InputTextBox.Select(text.Length, 0);
+                return;
+            }
+
+            var start = position;
+            if (char.IsWhiteSpace(text[start]))
+            {
+                while (start < text.Length && char.IsWhiteSpace(text[start]))
+                    start++;
+            }
+            else
+            {
+                while (start > 0 && !char.IsWhiteSpace(text[start]))
+                    start--;
+                if (char.IsWhiteSpace(text[start]))
+                    start++;
+            }
+            var end = start;
+            while (end < text.Length && !char.IsWhiteSpace(text[end]))
+                end++;
+            HighlightText(start, end - start);
+        }
+
+
 
         private void InputTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (IsSpeaking)
-                StartSpeaking();
+            StartSpeaking();
         }
 
         private void InputTextBox_SelectionChanged(object sender, RoutedEventArgs e)
         {
             if (!_updatingProgress && IsSpeaking)
                 StartSpeaking();
-            _updatingProgress = false;
+            if (!_updatingProgress)
+                HighlightWordAt(InputTextBox.SelectionStart);
+            else
+                _updatingProgress = false;
         }
 
         private void SpeedSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
@@ -146,5 +220,6 @@ namespace Speaker
             InputTextBox.Text = await Clipboard.GetContent().GetTextAsync();
             args.Handled = true;
         }
-    }
+
+       }
 }

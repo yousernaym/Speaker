@@ -8,11 +8,11 @@
     mc:Ignorable="d"
 	>
 
-	<Grid Padding="20" KeyDown="InputTextBox_KeyDown">
+	<Grid Padding="20" KeyboardAcceleratorPlacementMode="Hidden">
 		<Grid.KeyboardAccelerators>
-			<KeyboardAccelerator Key="V" Modifiers="Control" Invoked="Paste_Invoked"/>
+			<KeyboardAccelerator Key="V" Modifiers="Control" Invoked="Paste_Invoked" />
 		</Grid.KeyboardAccelerators>
-
+		
 		<Grid.ColumnDefinitions>
 			<ColumnDefinition Width="200"/>
 			<ColumnDefinition Width="*"/>
@@ -32,6 +32,6 @@
 
 		<!-- Input TextBox -->
 		<TextBox Grid.Column="1" x:Name="InputTextBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="Paste your text here" TextChanged="InputTextBox_TextChanged" SelectionChanged="InputTextBox_SelectionChanged"
-           VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
+           VerticalAlignment="Stretch" HorizontalAlignment="Stretch" PreviewKeyDown="InputTextBox_KeyDown"/>
 	</Grid>
 </Window>
