@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Speaker (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Speaker (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
