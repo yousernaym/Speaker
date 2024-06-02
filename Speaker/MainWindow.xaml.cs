@@ -1,20 +1,24 @@
+using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using System;
 using System.Linq;
 using System.Speech.Synthesis;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.System;
+using Windows.UI;
 using Windows.UI.StartScreen;
 using Windows.UI.Text.Core;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace Speaker
 {
     public sealed partial class MainWindow : Window
     {
+        Brush _playBrush;
+        Brush _pauseBrush;
         SpeechSynthesizer _speechSynthesizer;
         bool _updatingProgress;
         int _startPosition;
@@ -27,6 +31,9 @@ namespace Speaker
             InitSpeech();
             LoadVoices();
             InputTextBox.Focus(FocusState.Programmatic);
+            var accentColor = (Color)Application.Current.Resources["SystemAccentColor"];
+            _playBrush = new SolidColorBrush(accentColor);
+            _pauseBrush = new SolidColorBrush(Colors.Red);
         }
 
         private void InitSpeech()
@@ -54,7 +61,7 @@ namespace Speaker
             }
         }
 
-        private void TogglePlayPauseButton_Click(object sender, RoutedEventArgs e)
+        private void ToggleSpeakBtn_Click(object sender, RoutedEventArgs e)
         {
             if (IsSpeaking)
                 PauseReading();
@@ -70,6 +77,7 @@ namespace Speaker
             SetSpeed();
 
             PlaybackIcon.Symbol = Symbol.Pause;
+            ToggleSpeakBtn.Background = _pauseBrush;
             _speechSynthesizer.SpeakAsync(InputTextBox.Text.Substring(_startPosition));
         }
 
@@ -77,6 +85,7 @@ namespace Speaker
         {
             _speechSynthesizer.Pause();
             PlaybackIcon.Symbol = Symbol.Play;
+            ToggleSpeakBtn.Background = _playBrush;
         }
 
         private void _speechSynthesizer_SpeakProgress(object sender, SpeakProgressEventArgs e)
@@ -94,6 +103,7 @@ namespace Speaker
         private void _speechSynthesizer_SpeakCompleted(object sender, SpeakCompletedEventArgs e)
         {
             PlaybackIcon.Symbol = Symbol.Play;
+            ToggleSpeakBtn.Background = _playBrush;
             InputTextBox.Select(0, 0);
         }
 
@@ -101,7 +111,8 @@ namespace Speaker
         {
             if (e.Key == VirtualKey.Space)
             {
-                TogglePlayPauseButton_Click(this, null);
+                ToggleSpeakBtn_Click(this, null);
+                e.Handled = true;
             }
             else if (e.Key == VirtualKey.Left)
             {
