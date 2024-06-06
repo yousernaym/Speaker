@@ -6,6 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
+	Closed="Window_Closed"
 	>
 	<Grid Padding="20" KeyboardAcceleratorPlacementMode="Hidden" PreviewKeyDown="KeyDown">
 		<Grid.KeyboardAccelerators>
@@ -17,9 +18,9 @@
 			<ColumnDefinition Width="Auto"/>
 		</Grid.ColumnDefinitions>
 
-		<!-- Input TextBox -->
-		<TextBox Grid.Column="0" x:Name="InputTextBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="Paste your text here" TextChanged="InputTextBox_TextChanged" SelectionChanged="InputTextBox_SelectionChanged" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" />
-		
+		<!-- Text -->
+		<RichEditBox Grid.Column="0" x:Name="TextInput" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="Paste your text here" TextChanged="InputTextBox_TextChanged"  SelectionChanged="InputTextBox_SelectionChanged" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" />
+
 		<!-- Sidebar -->
 		<StackPanel Grid.Column="1" Width="200">
 			<ComboBox x:Name="VoiceComboBox" PlaceholderText="Select Voice" SelectionChanged="VoiceComboBox_SelectionChanged"/>

@@ -1,19 +1,16 @@
 using Microsoft.UI;
 using Microsoft.UI.Input;
+using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using System;
-using System.Linq;
 using System.Speech.Synthesis;
-using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.System;
 using Windows.UI;
 using Windows.UI.Core;
-using Windows.UI.StartScreen;
-using Windows.UI.Text.Core;
 
 namespace Speaker
 {
@@ -24,7 +21,6 @@ namespace Speaker
         SpeechSynthesizer _speechSynthesizer;
         bool _updatingProgress;
         int _startPosition;
-        string _inputText;
 
         bool IsSpeaking => _speechSynthesizer.State == SynthesizerState.Speaking;
 
@@ -33,7 +29,7 @@ namespace Speaker
             this.InitializeComponent();
             InitSpeech();
             LoadVoices();
-            InputTextBox.Focus(FocusState.Programmatic);
+            TextInput.Focus(FocusState.Programmatic);
             var accentColor = (Color)Application.Current.Resources["SystemAccentColor"];
             _playBrush = new SolidColorBrush(accentColor);
             _pauseBrush = new SolidColorBrush(Colors.Red);
@@ -74,14 +70,15 @@ namespace Speaker
 
         private void StartSpeaking()
         {
-            _startPosition = InputTextBox.SelectionStart;
+            _startPosition = TextInput.Document.Selection.StartPosition;
             InitSpeech();
             SetVoice();
             SetSpeed();
 
             PlaybackIcon.Symbol = Symbol.Pause;
             ToggleSpeakBtn.Background = _pauseBrush;
-            _speechSynthesizer.SpeakAsync(InputTextBox.Text.Substring(_startPosition));
+            TextInput.Document.GetText(TextGetOptions.UseLf, out var text);
+            _speechSynthesizer.SpeakAsync(text.Substring(_startPosition));
         }
 
         private void PauseReading()
@@ -99,15 +96,15 @@ namespace Speaker
 
         private void HighlightText(int charPosition, int charCount)
         {
-            InputTextBox.Select(charPosition, charCount);
-            InputTextBox.Focus(FocusState.Programmatic);
+            TextInput.Document.Selection.SetRange(charPosition, charPosition + charCount);
+            TextInput.Focus(FocusState.Programmatic);
         }
 
         private void _speechSynthesizer_SpeakCompleted(object sender, SpeakCompletedEventArgs e)
         {
             PlaybackIcon.Symbol = Symbol.Play;
             ToggleSpeakBtn.Background = _playBrush;
-            InputTextBox.Select(0, 0);
+            TextInput.Document.Selection.SetRange(0, 0);
         }
 
         private void KeyDown(object sender, KeyRoutedEventArgs e)
@@ -125,27 +122,38 @@ namespace Speaker
             else if (e.Key == VirtualKey.Left)
             {
                 var prevWordPos = FindStartOfPreviousWord();
-                InputTextBox.Select(prevWordPos, 0);
+                TextInput.Document.Selection.SetRange(prevWordPos, prevWordPos);
                 e.Handled = true;
             }
             else if (e.Key == VirtualKey.Right)
             {
                 var nextWordPos = FindStartOfNextWord();
-                InputTextBox.Select(nextWordPos, 0);
+                TextInput.Document.Selection.SetRange(nextWordPos, nextWordPos);
                 e.Handled = true;
             }
-            //else if (e.Key == VirtualKey.Up && isShiftPressed && isControlPressed)
-            //{
-            //    var pos = FindStartOfPreviousParagraph();
-            //    InputTextBox.Select(pos, 0);
-            //    e.Handled = true;
-            //}
+            else if (e.Key == VirtualKey.Up && isControlPressed)
+            {
+                var pos = FindStartOfPreviousParagraph();
+                TextInput.Document.Selection.SetRange(pos, pos);
+                e.Handled = true;
+            }
+            else if (e.Key == VirtualKey.Up)
+            {
+                TextInput.Document.GetText(TextGetOptions.UseLf, out var text);
+                var position = TextInput.Document.Selection.StartPosition;
+                if (position > 0 && text[position - 1] == '\n')
+                {
+                    var prevWordPos = FindStartOfPreviousWord();
+                    TextInput.Document.Selection.SetRange(prevWordPos, prevWordPos);
+                    e.Handled = true;
+                }
+            }
         }
 
         int FindStartOfPreviousWord()
         {
-            var position = InputTextBox.SelectionStart;
-            var text = InputTextBox.Text;
+            var position = TextInput.Document.Selection.StartPosition;
+            TextInput.Document.GetText(TextGetOptions.UseLf, out var text);
             if (text.Length == 0)
                 return 0;
             if (position >= text.Length)
@@ -162,8 +170,8 @@ namespace Speaker
 
         int FindStartOfNextWord()
         {
-            var position = InputTextBox.SelectionStart;
-            var text = InputTextBox.Text;
+            var position = TextInput.Document.Selection.StartPosition;
+            TextInput.Document.GetText(Microsoft.UI.Text.TextGetOptions.UseLf, out var text);
             if (text.Length == 0)
                 return 0;
             if (position >= text.Length)
@@ -178,14 +186,15 @@ namespace Speaker
 
         void HighlightWordAt(int position)
         {
-            var text = InputTextBox.Text;
+            TextInput.Document.GetText(Microsoft.UI.Text.TextGetOptions.UseLf, out var text);
             if (position >= text.Length)
             {
-                InputTextBox.Select(text.Length, 0);
+                TextInput.Document.Selection.SetRange(text.Length, text.Length);
                 return;
             }
 
             var start = position;
+            // If we start on whitespace, move forward to next word.
             if (char.IsWhiteSpace(text[start]))
             {
                 while (start < text.Length && char.IsWhiteSpace(text[start]))
@@ -206,7 +215,7 @@ namespace Speaker
 
 
 
-        private void InputTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        private void InputTextBox_TextChanged(object sender, RoutedEventArgs e)
         {
             StartSpeaking();
         }
@@ -216,7 +225,7 @@ namespace Speaker
             if (!_updatingProgress && IsSpeaking)
                 StartSpeaking();
             if (!_updatingProgress)
-                HighlightWordAt(InputTextBox.SelectionStart);
+                HighlightWordAt(TextInput.Document.Selection.StartPosition);
             else
                 _updatingProgress = false;
         }
@@ -246,38 +255,46 @@ namespace Speaker
 
         private async void Paste_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs e)
         {
-            InputTextBox.Text = _inputText = await Clipboard.GetContent().GetTextAsync();
+            var text = await Clipboard.GetContent().GetTextAsync();
+            TextInput.IsReadOnly = false;
+            TextInput.Document.SetText(TextSetOptions.None, text);
+            TextInput.IsReadOnly = true;
             e.Handled = true;
         }
 
         int FindStartOfPreviousParagraph()
         {
-            var position = InputTextBox.SelectionStart;
+            var position = TextInput.Document.Selection.StartPosition;
+            TextInput.Document.GetText(TextGetOptions.UseLf, out var text);
+            if (position >= text.Length)
+                return text.Length - 1;
 
-            if (position >= _inputText.Length)
-                return _inputText.Length - 1;
-
-            while (position > 0 && _inputText[position] != '\n')
+            while (position > 0 && text[position] != '\n')
                 position--;
-            while (position > 0 && char.IsWhiteSpace(_inputText[position]))
+            while (position > 0 && char.IsWhiteSpace(text[position]))
                 position--;
-            while (position > 0 && _inputText[position] != '\n')
+            while (position > 0 && text[position] != '\n')
                 position--;
 
             return position;
         }
 
-        bool IsLineBreakAtPosition(int position)
+        private void Window_Closed(object sender, WindowEventArgs args)
         {
-            if (position >= InputTextBox.Text.Length - 1)
-                return true;
-
-            var rect1 = InputTextBox.GetRectFromCharacterIndex(position, false);
-            var rect2 = InputTextBox.GetRectFromCharacterIndex(position + 1, false);
-
-            // If the Y-coordinate of the next character is greater, it's on a new line
-            return rect2.Y > rect1.Y;
+            _speechSynthesizer?.Dispose();
         }
+
+        //bool IsLineBreakAtPosition(int position)
+        //{
+        //    if (position >= InputTextBox.Document.leng - 1)
+        //        return true;
+
+        //    var rect1 = InputTextBox.GetRectFromCharacterIndex(position, false);
+        //    var rect2 = InputTextBox.GetRectFromCharacterIndex(position + 1, false);
+
+        //    // If the Y-coordinate of the next character is greater, it's on a new line
+        //    return rect2.Y > rect1.Y;
+        //}
 
     }
 }
