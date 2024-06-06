@@ -1,4 +1,5 @@
 using Microsoft.UI;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -10,6 +11,7 @@ using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.System;
 using Windows.UI;
+using Windows.UI.Core;
 using Windows.UI.StartScreen;
 using Windows.UI.Text.Core;
 
@@ -22,7 +24,8 @@ namespace Speaker
         SpeechSynthesizer _speechSynthesizer;
         bool _updatingProgress;
         int _startPosition;
-        
+        string _inputText;
+
         bool IsSpeaking => _speechSynthesizer.State == SynthesizerState.Speaking;
 
         public MainWindow()
@@ -107,8 +110,13 @@ namespace Speaker
             InputTextBox.Select(0, 0);
         }
 
-        private void InputTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
+        private void KeyDown(object sender, KeyRoutedEventArgs e)
         {
+            var shiftState = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift);
+            var controlState = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control);
+            bool isShiftPressed = (shiftState & CoreVirtualKeyStates.Down) == CoreVirtualKeyStates.Down;
+            bool isControlPressed = (controlState & CoreVirtualKeyStates.Down) == CoreVirtualKeyStates.Down;
+
             if (e.Key == VirtualKey.Space)
             {
                 ToggleSpeakBtn_Click(this, null);
@@ -126,12 +134,20 @@ namespace Speaker
                 InputTextBox.Select(nextWordPos, 0);
                 e.Handled = true;
             }
+            //else if (e.Key == VirtualKey.Up && isShiftPressed && isControlPressed)
+            //{
+            //    var pos = FindStartOfPreviousParagraph();
+            //    InputTextBox.Select(pos, 0);
+            //    e.Handled = true;
+            //}
         }
 
         int FindStartOfPreviousWord()
         {
             var position = InputTextBox.SelectionStart;
             var text = InputTextBox.Text;
+            if (text.Length == 0)
+                return 0;
             if (position >= text.Length)
                 position = text.Length - 1;
             while (position > 0 && !char.IsWhiteSpace(text[position]))
@@ -148,8 +164,10 @@ namespace Speaker
         {
             var position = InputTextBox.SelectionStart;
             var text = InputTextBox.Text;
+            if (text.Length == 0)
+                return 0;
             if (position >= text.Length)
-                position = text.Length - 1;
+                return text.Length - 1;
             while (position < text.Length && !char.IsWhiteSpace(text[position]))
                 position++;
             while (position < text.Length && char.IsWhiteSpace(text[position]))
@@ -226,11 +244,40 @@ namespace Speaker
             _speechSynthesizer.SelectVoice(voice);
         }
 
-        private async void Paste_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+        private async void Paste_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs e)
         {
-            InputTextBox.Text = await Clipboard.GetContent().GetTextAsync();
-            args.Handled = true;
+            InputTextBox.Text = _inputText = await Clipboard.GetContent().GetTextAsync();
+            e.Handled = true;
         }
 
-       }
+        int FindStartOfPreviousParagraph()
+        {
+            var position = InputTextBox.SelectionStart;
+
+            if (position >= _inputText.Length)
+                return _inputText.Length - 1;
+
+            while (position > 0 && _inputText[position] != '\n')
+                position--;
+            while (position > 0 && char.IsWhiteSpace(_inputText[position]))
+                position--;
+            while (position > 0 && _inputText[position] != '\n')
+                position--;
+
+            return position;
+        }
+
+        bool IsLineBreakAtPosition(int position)
+        {
+            if (position >= InputTextBox.Text.Length - 1)
+                return true;
+
+            var rect1 = InputTextBox.GetRectFromCharacterIndex(position, false);
+            var rect2 = InputTextBox.GetRectFromCharacterIndex(position + 1, false);
+
+            // If the Y-coordinate of the next character is greater, it's on a new line
+            return rect2.Y > rect1.Y;
+        }
+
+    }
 }
