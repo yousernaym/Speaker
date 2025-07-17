@@ -23,6 +23,7 @@ using Windows.UI;
 using Windows.UI.Core;
 using static PInvoke.User32;
 using WinRT.Interop;
+using System.Diagnostics;
 
 namespace Speaker
 {
@@ -413,7 +414,13 @@ namespace Speaker
 
         private void setScreenCaptureRect_Click(object sender, RoutedEventArgs e)
         {
-            ScreenCapture.CopyRectToClipboard(_screenCaptureRect);
+            var picker = new AreaPickerWindow();
+            picker.AreaSelected += rect =>
+            {
+                Debug.WriteLine($"Selected area: {rect.Width}×{rect.Height} at {rect.X},{rect.Y}");
+                _screenCaptureRect = rect;
+            };
+            picker.Activate();
         }
     }
 }
