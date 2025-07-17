@@ -28,6 +28,7 @@
 			<Button x:Name="ToggleSpeakBtn" Margin="0 15 0 0" Foreground="White" Background="{StaticResource SystemAccentColor}" HorizontalAlignment="Stretch" Click="ToggleSpeakBtn_Click">
 				<SymbolIcon x:Name="PlaybackIcon" Symbol="Play"/>
 			</Button>
+			<Button x:Name="setScreenCaptureRect" Click="setScreenCaptureRect_Click">Screen capture</Button>
 		</StackPanel>
 	</Grid>
 </Window>

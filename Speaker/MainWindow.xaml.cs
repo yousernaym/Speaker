@@ -1,21 +1,28 @@
-﻿using Microsoft.UI;
+﻿using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using Microsoft.UI.Xaml;
+using Windows.Foundation;
+using WinRT;
+using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Text;
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using System;
 using System.Speech.Synthesis;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.ApplicationModel.Email;
+using Windows.Graphics;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
 using Windows.Storage.Streams;
 using Windows.System;
 using Windows.UI;
 using Windows.UI.Core;
+using static PInvoke.User32;
+using WinRT.Interop;
 
 namespace Speaker
 {
@@ -26,6 +33,17 @@ namespace Speaker
         SpeechSynthesizer _speechSynthesizer;
         bool _updatingProgress;
         int _startPosition;
+        RectInt32 _screenCaptureRect = new RectInt32(960, 540, 960, 540);
+        private const int HOTKEY_ID = 1;
+        private const uint MOD_CONTROL = 0x0002;
+        private const uint MOD_SHIFT = 0x0004;
+        private const uint VK_S = 0x53;
+        private const int WM_HOTKEY = 0x0312;
+        private const int GWLP_WNDPROC = -4;
+
+        private readonly IntPtr _hwnd;
+        private readonly WndProcDelegate _subclassProc;
+        private readonly IntPtr _origWndProc;
 
         bool IsSpeaking => _speechSynthesizer.State == SynthesizerState.Speaking;
 
@@ -39,7 +57,53 @@ namespace Speaker
             _playBrush = new SolidColorBrush(accentColor);
             _pauseBrush = new SolidColorBrush(Colors.Red);
             Clipboard.ContentChanged += Clipboard_ContentChanged;
+            _hwnd = WindowNative.GetWindowHandle(this);
+
+            // 1. Register global hot‑key: Ctrl + Shift + S
+            if (!RegisterHotKey(_hwnd, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT, VK_S))
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "RegisterHotKey failed");
+
+            // 2. Subclass the window so we can intercept WM_HOTKEY
+            _subclassProc = WndProc;
+            _origWndProc = SetWindowLongPtr(_hwnd, GWLP_WNDPROC,
+                          Marshal.GetFunctionPointerForDelegate(_subclassProc));
         }
+
+        private IntPtr WndProc(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam)
+        {
+            if (msg == WM_HOTKEY && wParam.ToInt32() == HOTKEY_ID)
+            {
+                // 3. Capture a 400×300 rectangle starting at (100,100)
+                ScreenCapture.CopyRectToClipboard(_screenCaptureRect);
+                return IntPtr.Zero;                 // message handled
+            }
+
+            // Pass anything else to the original window procedure
+            return CallWindowProc(_origWndProc, hWnd, msg, wParam, lParam);
+        }
+
+        /* ========= cleanup ========= */
+        public void Dispose()
+        {
+            UnregisterHotKey(_hwnd, HOTKEY_ID);
+            SetWindowLongPtr(_hwnd, GWLP_WNDPROC, _origWndProc);
+            GC.SuppressFinalize(this);
+        }
+
+        /* ========= Win32 glue ========= */
+        private delegate IntPtr WndProcDelegate(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+        [DllImport("user32.dll")]  // SetWindowLongPtr / CallWindowProc work on both 32/64‑bit
+        private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr newProc);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr CallWindowProc(IntPtr prevProc, IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
         private void InitSpeech()
         {
@@ -115,35 +179,35 @@ namespace Speaker
 
         private void KeyDown(object sender, KeyRoutedEventArgs e)
         {
-            var shiftState = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift);
-            var controlState = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control);
+            var shiftState = InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift);
+            var controlState = InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
             bool isShiftPressed = (shiftState & CoreVirtualKeyStates.Down) == CoreVirtualKeyStates.Down;
             bool isControlPressed = (controlState & CoreVirtualKeyStates.Down) == CoreVirtualKeyStates.Down;
 
-            if (e.Key == VirtualKey.Space)
+            if (e.Key == Windows.System.VirtualKey.Space)
             {
                 ToggleSpeakBtn_Click(this, null);
                 e.Handled = true;
             }
-            else if (e.Key == VirtualKey.Left)
+            else if (e.Key == Windows.System.VirtualKey.Left)
             {
                 var prevWordPos = FindStartOfPreviousWord();
                 TextInput.Document.Selection.SetRange(prevWordPos, prevWordPos);
                 e.Handled = true;
             }
-            else if (e.Key == VirtualKey.Right)
+            else if (e.Key == Windows.System.VirtualKey.Right)
             {
                 var nextWordPos = FindStartOfNextWord();
                 TextInput.Document.Selection.SetRange(nextWordPos, nextWordPos);
                 e.Handled = true;
             }
-            else if (e.Key == VirtualKey.Up && isControlPressed)
+            else if (e.Key == Windows.System.VirtualKey.Up && isControlPressed)
             {
                 var pos = FindStartOfPreviousParagraph();
                 TextInput.Document.Selection.SetRange(pos, pos);
                 e.Handled = true;
             }
-            else if (e.Key == VirtualKey.Up)
+            else if (e.Key == Windows.System.VirtualKey.Up)
             {
                 TextInput.Document.GetText(TextGetOptions.UseLf, out var text);
                 var position = TextInput.Document.Selection.StartPosition;
@@ -265,14 +329,6 @@ namespace Speaker
             e.Handled = true;
         }
 
-        async Task PasteCoreAsync()
-        {
-            var text = await Clipboard.GetContent().GetTextAsync();
-            TextInput.IsReadOnly = false;
-            TextInput.Document.SetText(TextSetOptions.None, text);
-            TextInput.IsReadOnly = true;
-        }
-
         int FindStartOfPreviousParagraph()
         {
             var position = TextInput.Document.Selection.StartPosition;
@@ -304,7 +360,7 @@ namespace Speaker
                 {
                     await ProcessClipboardAsync();   // your existing method
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     
                 }
@@ -318,13 +374,13 @@ namespace Speaker
 
             string text = null;
 
-            // 4 a. Plain text on the clipboard
+            // Plain text on the clipboard
             if (data.Contains(StandardDataFormats.Text))
             {
                 text = await data.GetTextAsync();
             }
 
-            // 4 b. Bitmap on the clipboard – run it through OCR
+            // Bitmap on the clipboard – run it through OCR
             else if (data.Contains(StandardDataFormats.Bitmap))
             {
                 var bitmapRef = await data.GetBitmapAsync();
@@ -342,7 +398,7 @@ namespace Speaker
                 }
             }
 
-            // 4 c. Paste the text (if any) into the RichEditBox and start reading
+            // Paste the text (if any) into the RichEditBox and start reading
             if (!string.IsNullOrWhiteSpace(text))
                 PasteTextAndSpeak(text);
         }
@@ -352,9 +408,12 @@ namespace Speaker
             TextInput.IsReadOnly = false;
             TextInput.Document.SetText(TextSetOptions.None, text);
             TextInput.IsReadOnly = true;
-
-            // Immediately kick off TTS so the user hears the new text without pressing anything
             StartSpeaking();
+        }
+
+        private void setScreenCaptureRect_Click(object sender, RoutedEventArgs e)
+        {
+            ScreenCapture.CopyRectToClipboard(_screenCaptureRect);
         }
     }
 }
