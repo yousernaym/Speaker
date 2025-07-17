@@ -1,6 +1,7 @@
 ﻿using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Text;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -30,7 +31,7 @@ namespace Speaker
         SpeechSynthesizer _speechSynthesizer;
         bool _updatingProgress;
         int _startPosition;
-        RectInt32 _screenCaptureRect = new RectInt32(960, 540, 960, 540);
+        RectInt32? _screenCaptureRect = null;
         private const int SCREEN_CAPTURE_HOTKEY_ID = 1;
         private const int AREA_SELECT_HOTKEY_ID = 2;
         private const uint MOD_ALT = 0x0001;
@@ -69,7 +70,9 @@ namespace Speaker
             // Subclass the window so we can intercept WM_HOTKEY
             _subclassProc = WndProc;
             _origWndProc = SetWindowLongPtr(_hwnd, GWLP_WNDPROC,
-                          Marshal.GetFunctionPointerForDelegate(_subclassProc));
+                Marshal.GetFunctionPointerForDelegate(_subclassProc));
+        }
+
         }
 
         private IntPtr WndProc(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam)

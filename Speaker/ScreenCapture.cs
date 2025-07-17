@@ -7,8 +7,21 @@ namespace Speaker;
 
 public static class ScreenCapture
 {
-    public static void CopyRectToClipboard(RectInt32 rect)
+    private const int SM_CXSCREEN = 0;   // width  in raw pixels
+    private const int SM_CYSCREEN = 1;   // height in raw pixels
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+
+    public static void CopyRectToClipboard(RectInt32? rect = null)
     {
+        rect = rect ?? new RectInt32
+        {
+            X = 0,
+            Y = 0,
+            Width = GetSystemMetrics(SM_CXSCREEN),
+            Height = GetSystemMetrics(SM_CYSCREEN)
+        };
         DispatcherQueue dispatcher = DispatcherQueue.GetForCurrentThread();
         if (!dispatcher.HasThreadAccess)
         {
@@ -18,12 +31,12 @@ public static class ScreenCapture
 
         IntPtr hScreenDC = GetDC(IntPtr.Zero);
         IntPtr hMemDC = CreateCompatibleDC(hScreenDC);
-        IntPtr hBitmap = CreateCompatibleBitmap(hScreenDC, rect.Width, rect.Height);
+        IntPtr hBitmap = CreateCompatibleBitmap(hScreenDC, rect.Value.Width, rect.Value.Height);
         IntPtr hPrevBitmap = SelectObject(hMemDC, hBitmap);
 
         const int SRCCOPY = 0x00CC0020;
-        BitBlt(hMemDC, 0, 0, rect.Width, rect.Height,
-               hScreenDC, rect.X, rect.Y, SRCCOPY);
+        BitBlt(hMemDC, 0, 0, rect.Value.Width, rect.Value.Height,
+               hScreenDC, rect.Value.X, rect.Value.Y, SRCCOPY);
 
         SelectObject(hMemDC, hPrevBitmap);
 
@@ -32,7 +45,6 @@ public static class ScreenCapture
         {
             EmptyClipboard();
 
-            /* --------- FIX: use CF_BITMAP instead of CF_DIB --------- */
             if (SetClipboardData(ClipboardFormat.CF_BITMAP, hBitmap) == IntPtr.Zero)
                 throw new System.ComponentModel.Win32Exception(
                     Marshal.GetLastWin32Error(), "SetClipboardData failed");
