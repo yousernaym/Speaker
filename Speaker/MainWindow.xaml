@@ -19,7 +19,7 @@
 		</Grid.ColumnDefinitions>
 
 		<!-- Text -->
-		<RichEditBox Grid.Column="0" x:Name="TextInput" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="Paste your text here" TextChanged="InputTextBox_TextChanged"  SelectionChanged="InputTextBox_SelectionChanged" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" />
+		<RichEditBox Grid.Column="0" x:Name="TextInput" IsReadOnly="True" TextWrapping="Wrap" PlaceholderText="Paste your text here" TextChanged="InputTextBox_TextChanged"  SelectionChanged="InputTextBox_SelectionChanged" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" />
 
 		<!-- Sidebar -->
 		<StackPanel Grid.Column="1" Width="200">

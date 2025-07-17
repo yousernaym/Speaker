@@ -1,4 +1,4 @@
-using Microsoft.UI;
+﻿using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using System;
 using System.Speech.Synthesis;
+using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.System;
 using Windows.UI;
@@ -255,11 +256,16 @@ namespace Speaker
 
         private async void Paste_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs e)
         {
+            await PasteCoreAsync();
+            e.Handled = true;
+        }
+
+        async Task PasteCoreAsync()
+        {
             var text = await Clipboard.GetContent().GetTextAsync();
             TextInput.IsReadOnly = false;
             TextInput.Document.SetText(TextSetOptions.None, text);
             TextInput.IsReadOnly = true;
-            e.Handled = true;
         }
 
         int FindStartOfPreviousParagraph()
