@@ -1,19 +1,17 @@
-﻿using System;
-using System.ComponentModel;
-using System.Runtime.InteropServices;
-using Microsoft.UI.Xaml;
-using Windows.Foundation;
-using WinRT;
-using Microsoft.UI;
+﻿using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Text;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using System;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Speech.Synthesis;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
-using Windows.ApplicationModel.Email;
 using Windows.Graphics;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
@@ -21,9 +19,7 @@ using Windows.Storage.Streams;
 using Windows.System;
 using Windows.UI;
 using Windows.UI.Core;
-using static PInvoke.User32;
 using WinRT.Interop;
-using System.Diagnostics;
 
 namespace Speaker
 {
@@ -92,10 +88,10 @@ namespace Speaker
                     return IntPtr.Zero;                 // message handled
                 }
             }
-            
 
-                // Pass anything else to the original window procedure
-                return CallWindowProc(_origWndProc, hWnd, msg, wParam, lParam);
+
+            // Pass anything else to the original window procedure
+            return CallWindowProc(_origWndProc, hWnd, msg, wParam, lParam);
         }
 
         /* ========= cleanup ========= */
@@ -379,7 +375,7 @@ namespace Speaker
                 }
                 catch (Exception)
                 {
-                    
+
                 }
             });
         }

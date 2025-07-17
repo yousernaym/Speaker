@@ -1,7 +1,6 @@
-﻿using System;
+﻿using Microsoft.UI.Dispatching;
+using System;
 using System.Runtime.InteropServices;
-using Microsoft.UI.Dispatching;
-using Windows.Foundation;
 using Windows.Graphics;
 
 namespace Speaker;
