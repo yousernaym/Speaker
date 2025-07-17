@@ -1,7 +1,6 @@
 ﻿using Microsoft.UI;
 using Microsoft.UI.Input;
 using Microsoft.UI.Text;
-using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -71,8 +70,6 @@ namespace Speaker
             _subclassProc = WndProc;
             _origWndProc = SetWindowLongPtr(_hwnd, GWLP_WNDPROC,
                 Marshal.GetFunctionPointerForDelegate(_subclassProc));
-        }
-
         }
 
         private IntPtr WndProc(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam)

@@ -10,11 +10,9 @@
 	<Grid Background="#000000"
           PointerPressed="OnPointerPressed"
           PointerMoved="OnPointerMoved"
-          PointerReleased="OnPointerReleased">
-		<Grid.KeyboardAccelerators>
-			<KeyboardAccelerator Key="Escape" Invoked="OnEscape" />
-		</Grid.KeyboardAccelerators>
-
+          PointerReleased="OnPointerReleased"
+		  KeyDown="Grid_KeyDown">
+		
 		<Canvas x:Name="RootCanvas">
 			<!-- Will be shown while the user is dragging -->
 			<Rectangle x:Name="SelectionRect"

@@ -100,13 +100,6 @@ namespace Speaker
             Close();
         }
 
-        void OnEscape(KeyboardAccelerator sender,
-                KeyboardAcceleratorInvokedEventArgs args)
-        {
-            Close();
-            args.Handled = true;   // prevent the beep
-        }
-
         private void Window_Activated(object sender, WindowActivatedEventArgs args)
         {
             Native.SetWindowPos(
@@ -115,6 +108,15 @@ namespace Speaker
                 0, 0, 0, 0,
                 Native.SWP_NOMOVE | Native.SWP_NOSIZE |
                 Native.SWP_NOACTIVATE | Native.SWP_SHOWWINDOW);
+        }
+
+        private void Grid_KeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key == Windows.System.VirtualKey.Escape)
+            {
+                Close();
+                e.Handled = true;
+            }            
         }
     }
 
