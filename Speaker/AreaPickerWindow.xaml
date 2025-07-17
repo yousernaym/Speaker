@@ -3,10 +3,11 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:muxc="using:Microsoft.UI.Xaml"
-    >
+	Activated="Window_Activated"
+	>
 	
 	<!-- Slightly darken the screen so the selection stands out -->
-	<Grid Background="#40000000"
+	<Grid Background="#000000"
           PointerPressed="OnPointerPressed"
           PointerMoved="OnPointerMoved"
           PointerReleased="OnPointerReleased">
@@ -19,7 +20,7 @@
 			<Rectangle x:Name="SelectionRect"
                        Stroke="DodgerBlue"
                        StrokeThickness="2"
-                       Fill="#33A4C9FF"
+                       Fill="#ffffff"
                        Visibility="Collapsed"/>
 		</Canvas>
 	</Grid>

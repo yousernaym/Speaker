@@ -66,7 +66,7 @@ namespace Speaker
             if (!RegisterHotKey(_hwnd, SCREEN_CAPTURE_HOTKEY_ID, MOD_CONTROL | MOD_SHIFT, VK_S))
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "RegisterHotKey failed");
 
-            // Register global hot‑key for screen area select: Alt + Shift + S
+            // Register global hot‑key for screen area selection: Alt + Shift + S
             if (!RegisterHotKey(_hwnd, AREA_SELECT_HOTKEY_ID, MOD_ALT | MOD_SHIFT, VK_S))
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "RegisterHotKey failed");
 
@@ -88,7 +88,7 @@ namespace Speaker
                 }
                 else if (wParam.ToInt32() == AREA_SELECT_HOTKEY_ID)
                 {
-                    SetScreenCaptureArea();
+                    ShowAreaPicker();
                     return IntPtr.Zero;                 // message handled
                 }
             }
@@ -428,7 +428,7 @@ namespace Speaker
             StartSpeaking();
         }
 
-        private void SetScreenCaptureArea()
+        private void ShowAreaPicker()
         {
             var picker = new AreaPickerWindow();
             picker.AreaSelected += rect =>

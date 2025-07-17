@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
@@ -31,29 +32,28 @@ namespace Speaker
         Point _startDip;   // first corner in DIPs
         IntPtr _hwnd;
         double _dipScale;  // pixels per DIP for primary monitor
+        //const int SW_SHOWNOACTIVATE = 4;
 
         public AreaPickerWindow()
         {
             InitializeComponent();
 
-            // 1. Make the window borderless + full‑screen + always on top
             _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             var id = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd);
             var appWindow = AppWindow.GetFromWindowId(id);
+            var presenter = FullScreenPresenter.Create();
+            appWindow.SetPresenter(presenter);
+            appWindow.IsShownInSwitchers = false;
 
-            appWindow.SetPresenter(FullScreenPresenter.Create());
-            appWindow.IsShownInSwitchers = false;                  // keeps Alt‑Tab list clean
-            appWindow.TitleBar.ExtendsContentIntoTitleBar = true;  // hide caption bar
 
-            //// 2. Handle transparency
-            //var attr = PInvoke.User32.GetWindowLong(_hwnd, PInvoke.User32.WindowLongIndexFlags.GWL_EXSTYLE);
-            //PInvoke.User32.SetWindowLong(_hwnd,
-            //                             PInvoke.User32.WindowLongIndexFlags.GWL_EXSTYLE,
-            //                             attr | (int)PInvoke.User32.WindowStylesEx.WS_EX_LAYERED);
-            //// 0x01 alpha keeps the overlay click‑opaque but visually 
-            //PInvoke.User32.SetLayeredWindowAttributes(_hwnd, 0, 0x01, 0x02);
+            appWindow.IsShownInSwitchers = false;     // hide from Alt‑Tab
 
-            // 3. DPI – we only need the scale factor once
+            // Enable layered style so we can control opacity
+            int ex = Native.GetWindowLong(_hwnd, Native.GWL_EXSTYLE);
+            Native.SetWindowLong(_hwnd, Native.GWL_EXSTYLE, ex | Native.WS_EX_LAYERED);
+            Native.SetLayeredWindowAttributes(_hwnd, 0, 128, Native.LWA_ALPHA);
+
+            // DPI factor once for DIP→pixel conversion
             var dpi = PInvoke.User32.GetDpiForWindow(_hwnd);
             _dipScale = dpi / 96.0;
         }
@@ -116,5 +116,49 @@ namespace Speaker
             Close();
             args.Handled = true;   // prevent the beep
         }
+
+        private void Window_Activated(object sender, WindowActivatedEventArgs args)
+        {
+            Native.SetWindowPos(
+                _hwnd,
+                Native.HWND_TOPMOST,
+                0, 0, 0, 0,
+                Native.SWP_NOMOVE | Native.SWP_NOSIZE |
+                Native.SWP_NOACTIVATE | Native.SWP_SHOWWINDOW);
+        }
+    }
+
+    internal static class Native
+    {
+        public const int GWL_EXSTYLE = -20;
+        public const int WS_EX_LAYERED = 0x00080000;
+        public const int LWA_ALPHA = 0x00000002;
+        public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        public const uint SWP_NOMOVE = 0x0002;
+        public const uint SWP_NOSIZE = 0x0001;
+        public const uint SWP_NOACTIVATE = 0x0010;
+        public const uint SWP_SHOWWINDOW = 0x0040;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetLayeredWindowAttributes(
+            IntPtr hwnd,
+            uint crKey,   // 0 = no color‑key transparency
+            byte bAlpha,  // 0..255
+            uint dwFlags  // always LWA_ALPHA for our purpose
+        );
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool SetWindowPos(
+             IntPtr hWnd,
+             IntPtr hWndInsertAfter,
+             int X, int Y, int cx, int cy,
+             uint uFlags);
     }
 }
