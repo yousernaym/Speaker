@@ -35,7 +35,9 @@ namespace Speaker
         bool _updatingProgress;
         int _startPosition;
         RectInt32 _screenCaptureRect = new RectInt32(960, 540, 960, 540);
-        private const int HOTKEY_ID = 1;
+        private const int SCREEN_CAPTURE_HOTKEY_ID = 1;
+        private const int AREA_SELECT_HOTKEY_ID = 2;
+        private const uint MOD_ALT = 0x0001;
         private const uint MOD_CONTROL = 0x0002;
         private const uint MOD_SHIFT = 0x0004;
         private const uint VK_S = 0x53;
@@ -60,11 +62,15 @@ namespace Speaker
             Clipboard.ContentChanged += Clipboard_ContentChanged;
             _hwnd = WindowNative.GetWindowHandle(this);
 
-            // 1. Register global hot‑key: Ctrl + Shift + S
-            if (!RegisterHotKey(_hwnd, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT, VK_S))
+            // Register global hot‑key for screen capture: Ctrl + Shift + S
+            if (!RegisterHotKey(_hwnd, SCREEN_CAPTURE_HOTKEY_ID, MOD_CONTROL | MOD_SHIFT, VK_S))
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "RegisterHotKey failed");
 
-            // 2. Subclass the window so we can intercept WM_HOTKEY
+            // Register global hot‑key for screen area select: Alt + Shift + S
+            if (!RegisterHotKey(_hwnd, AREA_SELECT_HOTKEY_ID, MOD_ALT | MOD_SHIFT, VK_S))
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "RegisterHotKey failed");
+
+            // Subclass the window so we can intercept WM_HOTKEY
             _subclassProc = WndProc;
             _origWndProc = SetWindowLongPtr(_hwnd, GWLP_WNDPROC,
                           Marshal.GetFunctionPointerForDelegate(_subclassProc));
@@ -72,21 +78,31 @@ namespace Speaker
 
         private IntPtr WndProc(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam)
         {
-            if (msg == WM_HOTKEY && wParam.ToInt32() == HOTKEY_ID)
+            if (msg == WM_HOTKEY)
             {
-                // 3. Capture a 400×300 rectangle starting at (100,100)
-                ScreenCapture.CopyRectToClipboard(_screenCaptureRect);
-                return IntPtr.Zero;                 // message handled
+                if (wParam.ToInt32() == SCREEN_CAPTURE_HOTKEY_ID)
+                {
+                    // Capture a specified rect
+                    ScreenCapture.CopyRectToClipboard(_screenCaptureRect);
+                    return IntPtr.Zero;                 // message handled
+                }
+                else if (wParam.ToInt32() == AREA_SELECT_HOTKEY_ID)
+                {
+                    SetScreenCaptureArea();
+                    return IntPtr.Zero;                 // message handled
+                }
             }
+            
 
-            // Pass anything else to the original window procedure
-            return CallWindowProc(_origWndProc, hWnd, msg, wParam, lParam);
+                // Pass anything else to the original window procedure
+                return CallWindowProc(_origWndProc, hWnd, msg, wParam, lParam);
         }
 
         /* ========= cleanup ========= */
         public void Dispose()
         {
-            UnregisterHotKey(_hwnd, HOTKEY_ID);
+            UnregisterHotKey(_hwnd, SCREEN_CAPTURE_HOTKEY_ID);
+            UnregisterHotKey(_hwnd, AREA_SELECT_HOTKEY_ID);
             SetWindowLongPtr(_hwnd, GWLP_WNDPROC, _origWndProc);
             GC.SuppressFinalize(this);
         }
@@ -412,7 +428,7 @@ namespace Speaker
             StartSpeaking();
         }
 
-        private void setScreenCaptureRect_Click(object sender, RoutedEventArgs e)
+        private void SetScreenCaptureArea()
         {
             var picker = new AreaPickerWindow();
             picker.AreaSelected += rect =>
