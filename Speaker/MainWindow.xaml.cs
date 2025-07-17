@@ -9,6 +9,10 @@ using System;
 using System.Speech.Synthesis;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.ApplicationModel.Email;
+using Windows.Graphics.Imaging;
+using Windows.Media.Ocr;
+using Windows.Storage.Streams;
 using Windows.System;
 using Windows.UI;
 using Windows.UI.Core;
@@ -34,6 +38,7 @@ namespace Speaker
             var accentColor = (Color)Application.Current.Resources["SystemAccentColor"];
             _playBrush = new SolidColorBrush(accentColor);
             _pauseBrush = new SolidColorBrush(Colors.Red);
+            Clipboard.ContentChanged += Clipboard_ContentChanged;
         }
 
         private void InitSpeech()
@@ -256,7 +261,7 @@ namespace Speaker
 
         private async void Paste_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs e)
         {
-            await PasteCoreAsync();
+            await ProcessClipboardAsync();   // your existing method
             e.Handled = true;
         }
 
@@ -288,19 +293,68 @@ namespace Speaker
         private void Window_Closed(object sender, WindowEventArgs args)
         {
             _speechSynthesizer?.Dispose();
+            Clipboard.ContentChanged -= Clipboard_ContentChanged;
         }
 
-        //bool IsLineBreakAtPosition(int position)
-        //{
-        //    if (position >= InputTextBox.Document.leng - 1)
-        //        return true;
+        private void Clipboard_ContentChanged(object sender, object e)
+        {
+            DispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    await ProcessClipboardAsync();   // your existing method
+                }
+                catch (Exception ex)
+                {
+                    
+                }
+            });
+        }
 
-        //    var rect1 = InputTextBox.GetRectFromCharacterIndex(position, false);
-        //    var rect2 = InputTextBox.GetRectFromCharacterIndex(position + 1, false);
+        private async Task ProcessClipboardAsync()
+        {
+            var data = Clipboard.GetContent();
+            if (data == null) return;
 
-        //    // If the Y-coordinate of the next character is greater, it's on a new line
-        //    return rect2.Y > rect1.Y;
-        //}
+            string text = null;
 
+            // 4 a. Plain text on the clipboard
+            if (data.Contains(StandardDataFormats.Text))
+            {
+                text = await data.GetTextAsync();
+            }
+
+            // 4 b. Bitmap on the clipboard – run it through OCR
+            else if (data.Contains(StandardDataFormats.Bitmap))
+            {
+                var bitmapRef = await data.GetBitmapAsync();
+                if (bitmapRef != null)
+                {
+                    using IRandomAccessStream stream = await bitmapRef.OpenReadAsync();
+                    var decoder = await BitmapDecoder.CreateAsync(stream);
+                    var softwareBitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+
+                    var ocrEngine = OcrEngine.TryCreateFromUserProfileLanguages()
+                                 ?? OcrEngine.TryCreateFromLanguage(new Windows.Globalization.Language("en-US"));
+
+                    var result = await ocrEngine.RecognizeAsync(softwareBitmap);
+                    text = result?.Text;
+                }
+            }
+
+            // 4 c. Paste the text (if any) into the RichEditBox and start reading
+            if (!string.IsNullOrWhiteSpace(text))
+                PasteTextAndSpeak(text);
+        }
+
+        private void PasteTextAndSpeak(string text)
+        {
+            TextInput.IsReadOnly = false;
+            TextInput.Document.SetText(TextSetOptions.None, text);
+            TextInput.IsReadOnly = true;
+
+            // Immediately kick off TTS so the user hears the new text without pressing anything
+            StartSpeaking();
+        }
     }
 }
